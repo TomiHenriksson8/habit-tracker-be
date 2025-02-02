@@ -1,0 +1,38 @@
+
+# Ignore Cargo's build directory
+/target/
+
+# Ignore the Cargo lock file if you're creating a library (optional)
+/Cargo.lock
+
+# Ignore Rust-specific temporary files
+**/*.rs.bk
+**/*.rs.swp
+**/*.rs.swo
+
+# Ignore editor and IDE temporary files
+# (add more based on your editor)
+# Neovim/vi swap files
+*.swp
+*.swo
+*.un~
+
+# VSCode specific files
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs (CLion, IntelliJ, etc.)
+.idea/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore Node.js and frontend dependencies if present
+node_modules/
+dist/
