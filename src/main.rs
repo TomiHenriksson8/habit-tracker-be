@@ -24,6 +24,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(health_check))
         .nest("/api/auth", routes::auth::auth_routes())
+        .nest("/api/habits", routes::habits::habit_routes())
         .layer(TraceLayer::new_for_http());
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
 
