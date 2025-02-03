@@ -36,3 +36,4 @@ Thumbs.db
 # Ignore Node.js and frontend dependencies if present
 node_modules/
 dist/
+.env
