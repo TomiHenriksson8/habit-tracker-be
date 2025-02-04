@@ -1,18 +1,16 @@
-use crate::models::user::User;
-use lazy_static::lazy_static;
-use std::collections::HashMap;
-use std::sync::Mutex;
+use async_once_cell::Lazy;
+use mongo::{options::ClientOptions, Client, Database};
+use std::sync::Arc;
 
-lazy_static! {
-    static ref USERS: Mutex<HashMap<String, User>> = Mutex::new(HashMap::new());
-}
+static MONGO_CLIENT: Lazy<Arc<Client>> = Lazy::new(async {
+    let uri = std::env::var("MONGO_URI").expect("MONGO_URI mus be set");
+    let options = ClientOptions::parse(&uri)
+        .await
+        .expect("Failder to parse MongoDB opotions");
+    Arc::new(Client::with_options(options).expect("Failed to create MongoDB client"));
+});
 
-pub fn save_user(user: User) {
-    let mut users = USERS.lock().unwrap();
-    users.insert(user.id.clone(), user);
-}
-
-pub fn get_user_by_email(email: &str) -> Option<User> {
-    let users = USERS.lock().unwrap();
-    users.values().find(|user| user.email == email).cloned()
+pub async fn get_db() -> Database {
+    let client = MONGO_CLIENT.await.clone();
+    client.database("habit_tracker")
 }

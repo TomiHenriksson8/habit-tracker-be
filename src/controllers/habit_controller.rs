@@ -12,6 +12,14 @@ pub struct HabitRequest {
 }
 
 #[derive(Serialize)]
+pub struct HabitWithId {
+    pub habit_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub frequency: String,
+}
+
+#[derive(Serialize)]
 pub struct HabitResponse {
     pub message: String,
 }
@@ -32,4 +40,36 @@ pub async fn create_habit(payload: HabitRequest) -> HabitResponse {
 pub async fn list_habits() -> Vec<HabitRequest> {
     let habits = HABITS.lock().unwrap();
     habits.values().cloned().collect()
+}
+
+pub async fn get_habit(habit_id: &str) -> Option<HabitRequest> {
+    let habits = HABITS.lock().unwrap();
+    habits.get(habit_id).cloned()
+}
+
+pub async fn update_habit(habit_id: &str, payload: HabitWithId) -> HabitResponse {
+    let mut habits = HABITS.lock().unwrap();
+    if habits.contains_key(habit_id) {
+        habits.insert(habit_id.to_string(), payload);
+        HabitResponse {
+            message: "Habit updated successfully".to_string(),
+        }
+    } else {
+        HabitResponse {
+            message: "Habit nor found".to_string(),
+        }
+    }
+}
+
+pub async fn delete_habit(habit_id: &str) -> HabitResponse {
+    let mut habits = HABITS.lock().unwrap();
+    if habits.remove(habit_id).is_some() {
+        HabitResponse {
+            message: "Habit deleted successfully".to_string(),
+        }
+    } else {
+        HabitResponse {
+            message: "Habit not found".to_string(),
+        }
+    }
 }
