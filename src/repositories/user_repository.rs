@@ -1,5 +1,5 @@
 use crate::models::user::User;
-use mongodb::{bson::doc, errror::Result, Database};
+use mongodb::{bson::doc, error::Result, Database};
 
 pub async fn save_user(db: &Database, user: User) -> Result<()> {
     let collection = db.collection::<User>("users");

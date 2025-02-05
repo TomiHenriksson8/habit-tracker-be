@@ -49,7 +49,6 @@ pub async fn register(
     let hashed_password = hash_password(&payload.password);
 
     let new_user = User {
-        id: None,
         username: payload.username.clone(),
         email: payload.email.clone(),
         hashed_password,

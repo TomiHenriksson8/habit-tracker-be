@@ -1,19 +1,15 @@
-use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Mutex;
-use uuid::Uuid;
+use crate::db::get_db;
+use crate::models::habit::Habit;
+use futures::stream::TryStreamExt;
+use mongodb::{
+    bson::{doc, oid::ObjectId},
+    Collection,
+};
+use serde::{Deserialize, Serialize}; // Import the trait for `try_collect`
 
+/// Structs for request and response
 #[derive(Deserialize, Serialize, Clone)]
 pub struct HabitRequest {
-    pub title: String,
-    pub description: Option<String>,
-    pub frequency: String,
-}
-
-#[derive(Serialize)]
-pub struct HabitWithId {
-    pub habit_id: String,
     pub title: String,
     pub description: Option<String>,
     pub frequency: String,
@@ -24,52 +20,106 @@ pub struct HabitResponse {
     pub message: String,
 }
 
-lazy_static! {
-    static ref HABITS: Mutex<HashMap<String, HabitRequest>> = Mutex::new(HashMap::new());
+/// Function to get the MongoDB habits collection
+pub async fn get_habits_collection() -> Collection<Habit> {
+    let db = get_db().await;
+    db.collection::<Habit>("habits")
 }
 
+/// Create a habit
 pub async fn create_habit(payload: HabitRequest) -> HabitResponse {
-    let habit_id = Uuid::new_v4().to_string();
-    HABITS.lock().unwrap().insert(habit_id.clone(), payload);
+    let collection = get_habits_collection().await;
 
-    HabitResponse {
-        message: "Habit created successfully".to_string(),
+    let new_habit = Habit {
+        id: None,
+        title: payload.title,
+        description: payload.description,
+        frequency: payload.frequency,
+    };
+
+    match collection.insert_one(new_habit, None).await {
+        Ok(_) => HabitResponse {
+            message: "Habit created successfully".to_string(),
+        },
+        Err(_) => HabitResponse {
+            message: "Failed to create habit".to_string(),
+        },
     }
 }
 
-pub async fn list_habits() -> Vec<HabitRequest> {
-    let habits = HABITS.lock().unwrap();
-    habits.values().cloned().collect()
-}
+/// List all habits
+pub async fn list_habits() -> Vec<Habit> {
+    let collection = get_habits_collection().await;
 
-pub async fn get_habit(habit_id: &str) -> Option<HabitRequest> {
-    let habits = HABITS.lock().unwrap();
-    habits.get(habit_id).cloned()
-}
-
-pub async fn update_habit(habit_id: &str, payload: HabitWithId) -> HabitResponse {
-    let mut habits = HABITS.lock().unwrap();
-    if habits.contains_key(habit_id) {
-        habits.insert(habit_id.to_string(), payload);
-        HabitResponse {
-            message: "Habit updated successfully".to_string(),
+    match collection.find(None, None).await {
+        Ok(cursor) => {
+            cursor.try_collect::<Vec<Habit>>().await.unwrap_or_default() // If an error occurs, return an empty vector
         }
-    } else {
-        HabitResponse {
-            message: "Habit nor found".to_string(),
-        }
+        Err(_) => vec![], // Handle error by returning an empty list
     }
 }
 
+/// Get a habit by ID
+pub async fn get_habit(habit_id: &str) -> Option<Habit> {
+    let collection = get_habits_collection().await;
+
+    match ObjectId::parse_str(habit_id) {
+        Ok(object_id) => collection
+            .find_one(doc! { "_id": object_id }, None)
+            .await
+            .ok()
+            .flatten(),
+        Err(_) => None,
+    }
+}
+
+/// Update a habit by ID
+pub async fn update_habit(habit_id: &str, payload: HabitRequest) -> HabitResponse {
+    let collection = get_habits_collection().await;
+
+    match ObjectId::parse_str(habit_id) {
+        Ok(object_id) => {
+            let update = doc! {
+                "$set": {
+                    "title": payload.title,
+                    "description": payload.description,
+                    "frequency": payload.frequency,
+                }
+            };
+
+            match collection
+                .update_one(doc! { "_id": object_id }, update, None)
+                .await
+            {
+                Ok(result) if result.modified_count > 0 => HabitResponse {
+                    message: "Habit updated successfully".to_string(),
+                },
+                _ => HabitResponse {
+                    message: "Habit not found or update failed".to_string(),
+                },
+            }
+        }
+        Err(_) => HabitResponse {
+            message: "Invalid habit ID".to_string(),
+        },
+    }
+}
+
+/// Delete a habit by ID
 pub async fn delete_habit(habit_id: &str) -> HabitResponse {
-    let mut habits = HABITS.lock().unwrap();
-    if habits.remove(habit_id).is_some() {
-        HabitResponse {
-            message: "Habit deleted successfully".to_string(),
-        }
-    } else {
-        HabitResponse {
-            message: "Habit not found".to_string(),
-        }
+    let collection = get_habits_collection().await;
+
+    match ObjectId::parse_str(habit_id) {
+        Ok(object_id) => match collection.delete_one(doc! { "_id": object_id }, None).await {
+            Ok(result) if result.deleted_count > 0 => HabitResponse {
+                message: "Habit deleted successfully".to_string(),
+            },
+            _ => HabitResponse {
+                message: "Habit not found".to_string(),
+            },
+        },
+        Err(_) => HabitResponse {
+            message: "Invalid habit ID".to_string(),
+        },
     }
 }
