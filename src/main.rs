@@ -1,3 +1,4 @@
+
 mod controllers;
 mod db;
 mod models;
@@ -13,6 +14,7 @@ use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
+use tower_http::cors::{CorsLayer, Any}; // Import CORS
 
 #[derive(Serialize)]
 struct HealthCheckResponse {
@@ -39,21 +41,26 @@ async fn main() {
 
     // Get the MongoDB database reference
     let database = get_db().await;
-
-    // Share the database reference across routes
     let shared_db = Arc::new(database);
+
+    // Set up CORS middleware
+    let cors = CorsLayer::new()
+        .allow_origin(Any) // Allow all origins (for development)
+        .allow_methods(Any) // Allow GET, POST, PUT, DELETE, etc.
+        .allow_headers(Any); // Allow all headers
 
     // Set up the application router
     let app = Router::new()
         .route("/", get(health_check))
         .nest(
             "/api/auth",
-            routes::auth::auth_routes().layer(Extension(shared_db.clone())), // Attach DB to auth routes
+            routes::auth::auth_routes().layer(Extension(shared_db.clone())),
         )
         .nest(
             "/api/habits",
-            routes::habits::habit_routes().layer(Extension(shared_db.clone())), // Attach DB to habits routes
+            routes::habits::habit_routes().layer(Extension(shared_db.clone())),
         )
+        .layer(cors) // Apply CORS middleware here
         .layer(TraceLayer::new_for_http());
 
     // Start the server
@@ -65,3 +72,4 @@ async fn main() {
         .await
         .expect("Failed to start server");
 }
+
