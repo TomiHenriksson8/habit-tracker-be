@@ -19,6 +19,6 @@ rand = "0.8"
 uuid = { version = "1.2", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 tower-http = { version = "0.4", features = ["trace", "cors"] }
-axum = "0.6"
+axum = { version = "0.6", features = ["headers"] }
 tokio = { version = "1", features = ["full"] }
 

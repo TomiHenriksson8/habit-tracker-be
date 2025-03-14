@@ -1,8 +1,10 @@
+
 use crate::models::user::User;
 use crate::repositories::user_repository::{get_user_by_email, save_user};
-use crate::utils::{generate_jwt, hash_password, verify_password};
+use crate::utils::{generate_jwt, verify_password, hash_password, decode_jwt};
 use axum::{
-    extract::{Extension, Json},
+    extract::{Extension, Json, TypedHeader},
+    headers::{Authorization, authorization::Bearer}, // ✅ Correct single import
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -33,11 +35,18 @@ pub struct RegisterResponse {
     pub message: String,
 }
 
+#[derive(Serialize)]
+pub struct UserResponse {
+    pub username: String,
+    pub email: String,
+}
+
+// 🟢 Register User
 pub async fn register(
     Extension(db): Extension<Arc<Database>>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<Json<RegisterResponse>, Response> {
-    // Check if the user already exists
+    // Check if user already exists
     if get_user_by_email(&db, &payload.email)
         .await
         .unwrap_or(None)
@@ -65,15 +74,16 @@ pub async fn register(
     }
 }
 
+// 🟢 User Login
 pub async fn login(
     Extension(db): Extension<Arc<Database>>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, Response> {
     match get_user_by_email(&db, &payload.email).await {
         Ok(Some(user)) => {
-            // Verify the password
+            // Verify password
             if verify_password(&payload.password, &user.hashed_password) {
-                let token = generate_jwt(&user.username);
+                let token = generate_jwt(&user.email);
                 Ok(Json(LoginResponse { token }))
             } else {
                 Err((StatusCode::UNAUTHORIZED, "Invalid password").into_response())
@@ -84,5 +94,26 @@ pub async fn login(
             eprintln!("Failed to retrieve user: {}", err);
             Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to retrieve user").into_response())
         }
+    }
+}
+
+pub async fn get_user(
+    TypedHeader(auth): TypedHeader<Authorization<Bearer>>, // ✅ Correct generic type
+    Extension(db): Extension<Arc<Database>>,
+) -> Result<Json<UserResponse>, Response> {
+    let token = auth.token().to_string(); // ✅ Extracts the token correctly
+
+    match decode_jwt(&token) {
+        Ok(email) => {
+            if let Some(user) = get_user_by_email(&db, &email).await.unwrap_or(None) {
+                Ok(Json(UserResponse {
+                    username: user.username,
+                    email: user.email,
+                }))
+            } else {
+                Err((StatusCode::NOT_FOUND, "User not found").into_response())
+            }
+        }
+        Err(_) => Err((StatusCode::UNAUTHORIZED, "Invalid token").into_response()),
     }
 }
