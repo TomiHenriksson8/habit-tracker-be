@@ -6,7 +6,7 @@ mod repositories;
 mod routes;
 mod utils;
 
-use axum::{extract::Extension, routing::get, Json, Router};
+use axum::{extract::Extension, http::{Method, HeaderValue}, routing::get, Json, Router};
 use db::get_db;
 use dotenvy::dotenv;
 use serde::Serialize;
@@ -29,27 +29,27 @@ async fn health_check() -> Json<HealthCheckResponse> {
 
 #[tokio::main]
 async fn main() {
-    // Load .env file
     dotenv().ok();
 
-    // Debug print to ensure the environment variable is loaded
     if let Ok(uri) = env::var("MONGO_URI") {
-        println!("MONGO_URI is set: {}", uri);
+        println!("✅ MONGO_URI is set: {}", uri);
     } else {
-        println!("MONGO_URI is not set!");
+        println!("❌ MONGO_URI is not set!");
     }
 
-    // Get the MongoDB database reference
     let database = get_db().await;
     let shared_db = Arc::new(database);
 
-    // Set up CORS middleware
-    let cors = CorsLayer::new()
-        .allow_origin(Any) // Allow all origins (for development)
-        .allow_methods(Any) // Allow GET, POST, PUT, DELETE, etc.
-        .allow_headers(Any); // Allow all headers
+    let frontend_url = "https://habit-tracker-dgcqa5p6t-tomi-s-projects.vercel.app";
 
-    // Set up the application router
+    println!("🚀 Allowing CORS for frontend: {}", frontend_url);
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_headers(Any)
+        .expose_headers(Any);
+
     let app = Router::new()
         .route("/", get(health_check))
         .nest(
@@ -60,16 +60,14 @@ async fn main() {
             "/api/habits",
             routes::habits::habit_routes().layer(Extension(shared_db.clone())),
         )
-        .layer(cors) // Apply CORS middleware here
+        .layer(cors)
         .layer(TraceLayer::new_for_http());
 
-    // Start the server
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
-    println!("Server running at http://{}", addr);
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    println!("🚀 Server running at http://{}", addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
-        .expect("Failed to start server");
+        .expect("❌ Failed to start server");
 }
-

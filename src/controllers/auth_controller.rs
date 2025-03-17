@@ -1,4 +1,4 @@
-
+use mongodb::bson::oid::ObjectId;
 use crate::models::user::User;
 use crate::repositories::user_repository::{get_user_by_email, save_user};
 use crate::utils::{generate_jwt, verify_password, hash_password, decode_jwt};
@@ -37,6 +37,7 @@ pub struct RegisterResponse {
 
 #[derive(Serialize)]
 pub struct UserResponse {
+    pub id: String,
     pub username: String,
     pub email: String,
 }
@@ -58,6 +59,7 @@ pub async fn register(
     let hashed_password = hash_password(&payload.password);
 
     let new_user = User {
+        id: Some(ObjectId::new()), // ✅ Generate and assign a new ObjectId
         username: payload.username.clone(),
         email: payload.email.clone(),
         hashed_password,
@@ -98,15 +100,16 @@ pub async fn login(
 }
 
 pub async fn get_user(
-    TypedHeader(auth): TypedHeader<Authorization<Bearer>>, // ✅ Correct generic type
+    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
     Extension(db): Extension<Arc<Database>>,
 ) -> Result<Json<UserResponse>, Response> {
-    let token = auth.token().to_string(); // ✅ Extracts the token correctly
+    let token = auth.token().to_string();
 
     match decode_jwt(&token) {
         Ok(email) => {
             if let Some(user) = get_user_by_email(&db, &email).await.unwrap_or(None) {
                 Ok(Json(UserResponse {
+                    id: user.id.unwrap().to_hex(), // ✅ Convert ObjectId to string
                     username: user.username,
                     email: user.email,
                 }))
