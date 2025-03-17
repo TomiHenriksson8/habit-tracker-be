@@ -75,3 +75,8 @@ Thumbs.db
 node_modules/
 dist/
 .env
+# Ignore generated Rust files
+src/controllers/habit_*
+src/models/habit_*
+src/routes/habits_*
+src/db.rs
