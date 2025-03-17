@@ -86,6 +86,10 @@ The server will run on `http://localhost:8000`.
 | PUT    | `/api/habits/:id/complete` | Mark habit as completed  |
 | DELETE | `/api/habits/:id`          | Delete a habit by ID     |
 
+## 🌐 Server
+
+[https://habit-tracker-production-74a7.up.railway.app/](https://habit-tracker-production-74a7.up.railway.app/)
+
 ## 🛠 Running Locally
 
 Start the server:
